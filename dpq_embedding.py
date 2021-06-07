@@ -11,16 +11,15 @@ class DPQEmbedding(tf.keras.layers.Layer):
         self.k = k
         self.d = d
         self.sub_size = embebdding_size//d
+        self.query_wemb = self.add_weight(name='emb_table', shape=[self.vocab_size, self.embedding_size], dtype=tf.float32, initializer="he_normal", trainable=True)
+        self.kdq = KDQuantizer(self.k, self.d, self.sub_size, self.share_subspace)
 
     def call(self, inputs, training=None): # was D * subs_size before TODO
-        query_wemb = self.add_weight(shape=[self.vocab_size, self.embedding_size], dtype=tf.float32, initializer="random_normal", trainable=True)
         idxs = tf.reshape(inputs, [-1]) #flatten 
 
-        input_emb = tf.nn.embedding_lookup(query_wemb, np.asarray(idxs, dtype=np.int32)) 
+        input_emb = tf.nn.embedding_lookup(self.query_wemb, idxs) 
 
-        kdq = KDQuantizer(self.k, self.d, self.sub_size, self.share_subspace)
-
-        _, input_emb = kdq(tf.reshape(input_emb, [-1, self.d, self.sub_size]), training=training)
+        _, input_emb = self.kdq(tf.reshape(input_emb, [-1, self.d, self.sub_size]), training=training)
         final_size = tf.concat([tf.shape(inputs), tf.constant([self.embedding_size])], 0)
         input_emb = tf.reshape(input_emb, final_size)
         return input_emb
@@ -52,10 +51,12 @@ class KDQuantizer(tf.keras.layers.Layer):
 
         # Create centroids for keys and values.
         d_to_create = 1 if shared_centroids else d
-        self.centroids_k = self.add_weight(shape=[d_to_create, k, dim_size], initializer="random_normal", trainable = True)
+        self.centroids_k = self.add_weight(name='centroids', shape=[d_to_create, k, dim_size], initializer="random_normal", trainable = True)
         
         if shared_centroids:
             self.centroids_k = tf.tile(self.centroids_k, [d, 1, 1])
+
+        self.batch_norm = tf.keras.layers.BatchNormalization(scale=False, center=False)
 
     def call(self, inputs, training=True):
         """Returns quantized embeddings from centroids.
@@ -74,7 +75,7 @@ class KDQuantizer(tf.keras.layers.Layer):
                         tf.transpose(self.centroids_k, perm=[0, 2, 1]))  # (D, bs, K)
         response = -norm_1 + 2 * tf.transpose(dot, perm=[1, 0, 2]) - norm_2
         response = tf.reshape(response, [-1, self.d, self.k])
-        response = tf.keras.layers.BatchNormalization(scale=False, center=False)(response, training=training)
+        response = self.batch_norm(response, training=training)
 
         # Compute the codes based on response.
         codes = tf.argmax(response, -1)  # (batch_size, D)

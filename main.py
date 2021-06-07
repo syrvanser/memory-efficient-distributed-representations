@@ -37,7 +37,7 @@ parser.add_argument('--batch_size', type=int, default=512)
 parser.add_argument('--epochs', type=int, default=50)
 parser.add_argument('--learning_rate', type=float, default=0.001)
 parser.add_argument('--l2_norm', type=float, default=0.00002)
-parser.add_argument('--embedding_dimension', type=int, default=8)
+parser.add_argument('--embedding_dimensions', type=int, default=8)
 parser.add_argument('--num_negatives', type=int, default=4)
 parser.add_argument('--mlp_1', type=int, default=64)
 parser.add_argument('--mlp_2', type=int, default=32)
@@ -124,7 +124,7 @@ eval_test = tf.data.Dataset.from_tensor_slices(eval_test)
 
 if args.model == "mf":
     model = MovielensModel(args, unique_user_ids, unique_movie_ids)
-else: 
+elif args.model == "dpq": 
     model = DPQMovielensModel(args, unique_user_ids, unique_movie_ids)
 model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate))
 model.ranking_model((["123"], ["42"]))

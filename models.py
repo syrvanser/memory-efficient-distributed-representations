@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_recommenders as tfrs
-import dpq_embedding
 
+from dpq_embedding import DPQEmbedding
 from typing import Dict, Text
 
 
@@ -14,7 +14,7 @@ class RankingModel(tf.keras.Model):
         self.user_embeddings = tf.keras.Sequential([
             tf.keras.layers.experimental.preprocessing.StringLookup(
               vocabulary=unique_user_ids, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_user_ids) + 1, args.embedding_dimension, embeddings_initializer="he_normal",
+            tf.keras.layers.Embedding(len(unique_user_ids) + 1, args.embedding_dimensions, embeddings_initializer="he_normal",
                   embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
         ])
 
@@ -22,7 +22,7 @@ class RankingModel(tf.keras.Model):
         self.movie_embeddings = tf.keras.Sequential([
             tf.keras.layers.experimental.preprocessing.StringLookup(
                 vocabulary=unique_movie_ids, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_movie_ids) + 1, args.embedding_dimension, embeddings_initializer="he_normal",
+            tf.keras.layers.Embedding(len(unique_movie_ids) + 1, args.embedding_dimensions, embeddings_initializer="he_normal",
                 embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
         ])
     
@@ -74,14 +74,14 @@ class DPQRankingModel(tf.keras.Model):
         self.user_embeddings = tf.keras.Sequential([
             tf.keras.layers.experimental.preprocessing.StringLookup(
               vocabulary=unique_user_ids, mask_token=None),
-            dpq_embedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimension)
+            DPQEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions)
         ])
 
     # Compute embeddings for movies.
         self.movie_embeddings = tf.keras.Sequential([
             tf.keras.layers.experimental.preprocessing.StringLookup(
                 vocabulary=unique_movie_ids, mask_token=None),
-            dpq_embedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimension)
+            DPQEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions)
         ])
     
         self.dot = tf.keras.layers.Dot(axes=1)
@@ -110,7 +110,7 @@ class DPQMovielensModel(tfrs.models.Model):
 
     def __init__(self, args, unique_user_ids, unique_movie_ids):
         super().__init__()
-        self.ranking_model: tf.keras.Model = RankingModel(args, unique_user_ids, unique_movie_ids)
+        self.ranking_model: tf.keras.Model = DPQRankingModel(args, unique_user_ids, unique_movie_ids)
         self.task: tf.keras.layers.Layer = tfrs.tasks.Ranking(
             loss = tf.keras.losses.BinaryCrossentropy(),
             metrics=[tf.keras.metrics.BinaryCrossentropy()]

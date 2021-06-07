@@ -5,7 +5,7 @@ conda activate medr
 epochs=50
 learning_rate=0.001
 batch_size=512
-embedding_dimension=8
+embedding_dimensions=8
 num_negatives=4
 l2_norm=0.00002
 mlp_1=64
@@ -15,4 +15,4 @@ exp_dir=mf
 model=mf
 seed=0
 
-python main.py --batch_size=$batch_size --epochs=$epochs --learning_rate=$learning_rate --seed=$seed --embedding_dimension=$embedding_dimension --l2_norm=$l2_norm --num_negatives=$num_negatives --mlp_1=$mlp_1 --mlp_2=$mlp_2 --dataset=$dataset --exp_dir=$exp_dir --model=$model
+python main.py --batch_size=$batch_size --epochs=$epochs --learning_rate=$learning_rate --seed=$seed --embedding_dimensions=$embedding_dimensions --l2_norm=$l2_norm --num_negatives=$num_negatives --mlp_1=$mlp_1 --mlp_2=$mlp_2 --dataset=$dataset --exp_dir=$exp_dir --model=$model
