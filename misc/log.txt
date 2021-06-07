@@ -1,0 +1,8 @@
+best eval structure - pick 99+1, make prediction or factorized top K + ranking?
+
+best eval?
+
+
+add ndcg
+more output layerz
+tweak batch sizes 
