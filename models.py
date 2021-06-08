@@ -54,8 +54,7 @@ class MovielensModel(tfrs.models.Model):
         super().__init__()
         self.ranking_model: tf.keras.Model = RankingModel(args, unique_user_ids, unique_movie_ids)
         self.task: tf.keras.layers.Layer = tfrs.tasks.Ranking(
-            loss = tf.keras.losses.BinaryCrossentropy(),
-            metrics=[tf.keras.metrics.BinaryCrossentropy()]
+            loss = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
       )
 
     def compute_loss(self, features: Dict[Text, tf.Tensor], training=False) -> tf.Tensor:

@@ -41,7 +41,6 @@ parser.add_argument('--embedding_dimensions', type=int, default=8)
 parser.add_argument('--num_negatives', type=int, default=4)
 parser.add_argument('--mlp_1', type=int, default=64)
 parser.add_argument('--mlp_2', type=int, default=32)
-parser.add_argument('--mlp_3', type=int, default=16)
 parser.add_argument('--dataset', type=str, default="100k")
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--exp_dir', type=str, default="temp")
@@ -125,12 +124,14 @@ eval_test = test.to_dict("list")
 eval_test = {name: np.array(value) for name, value in eval_test.items()}
 eval_test = tf.data.Dataset.from_tensor_slices(eval_test)
 
-if args.model == "mf":
-    model = MovielensModel(args, unique_user_ids, unique_movie_ids)
-elif args.model == "dpq": 
-    model = DPQMovielensModel(args, unique_user_ids, unique_movie_ids)
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate))
-model.ranking_model((["123"], ["42"]))
+mirrored_strategy = tf.distribute.MirroredStrategy()
+with mirrored_strategy.scope():
+    if args.model == "mf":
+        model = MovielensModel(args, unique_user_ids, unique_movie_ids)
+    elif args.model == "dpq": 
+        model = DPQMovielensModel(args, unique_user_ids, unique_movie_ids)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate))
+    model.ranking_model((["123"], ["42"]))
 
 cached_train = train.shuffle(args.ds_size, seed=args.seed).batch(args.batch_size).cache()
 cached_test = eval_test.batch(4096).cache()
