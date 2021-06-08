@@ -41,6 +41,7 @@ parser.add_argument('--embedding_dimensions', type=int, default=8)
 parser.add_argument('--num_negatives', type=int, default=4)
 parser.add_argument('--mlp_1', type=int, default=64)
 parser.add_argument('--mlp_2', type=int, default=32)
+parser.add_argument('--mlp_3', type=int, default=16)
 parser.add_argument('--dataset', type=str, default="100k")
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--exp_dir', type=str, default="temp")
@@ -57,11 +58,13 @@ tf.random.set_seed(args.seed)
 np.random.seed(args.seed)
 os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
-ds = "100k"
-if ds == "100k":
+if args.dataset == "100k":
     path = "movielens/100k-ratings"
     args.ds_size = 100000
-elif ds == "20m":
+elif args.dataset == "1m":
+    path = "movielens/1m-ratings"
+    args.ds_size = 1000000
+elif args.dataset == "20m":
     path = "movielens/20m-ratings"
     args.ds_size = 20000000
 else:
