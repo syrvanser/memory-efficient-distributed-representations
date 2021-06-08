@@ -5,3 +5,5 @@ logs/
 og
 results
 *.code-workspace
+data/
+*.tar.gz

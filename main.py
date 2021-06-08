@@ -48,6 +48,7 @@ parser.add_argument('--k', type=int, default=32)
 parser.add_argument('--d', type=int, default=8)
 parser.add_argument('--shared_centroids', type=bool, default=True)
 parser.add_argument('--model', type=str, default="mf")
+parser.add_argument('--download', type=bool, default=False)
 
 
 args = parser.parse_args()
@@ -58,13 +59,13 @@ np.random.seed(args.seed)
 os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
 if args.dataset == "100k":
-    path = "movielens/100k-ratings"
+    dataset = "movielens/100k-ratings"
     args.ds_size = 100000
 elif args.dataset == "1m":
-    path = "movielens/1m-ratings"
+    dataset = "movielens/1m-ratings"
     args.ds_size = 1000000
 elif args.dataset == "20m":
-    path = "movielens/20m-ratings"
+    dataset = "movielens/20m-ratings"
     args.ds_size = 20000000
 else:
     raise ValueError("Unknown dataset")
@@ -81,7 +82,7 @@ logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.info(f'Running experiment with arguments {args}')
 
 
-ratings = tfds.load(path, split="train", shuffle_files=True)
+ratings = tfds.load(dataset, data_dir=os.path.join(dir_path, 'data'), split="train", download=args.download, shuffle_files=True)
 ratings = ratings.map(lambda x: {
     "movie_id": x["movie_id"],
     "user_id": x["user_id"],
