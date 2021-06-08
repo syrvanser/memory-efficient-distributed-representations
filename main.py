@@ -77,10 +77,10 @@ os.makedirs(exp_dir, exist_ok=True)
 
 # now make variables for all the relevant files we'll make
 log_path = os.path.join(exp_dir, 'log.log')
-logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",)
-logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+#logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",)
+#logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.info(f'Running experiment with arguments {args}')
-
 
 ratings = tfds.load(dataset, data_dir=os.path.join(dir_path, 'data'), split="train", download=args.download, shuffle_files=True)
 ratings = ratings.map(lambda x: {
@@ -156,7 +156,7 @@ callbacks.append(tf.keras.callbacks.ModelCheckpoint(
 
 logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
-callbacks.append(TBCallback(logdir, histogram_freq=1))
+# callbacks.append(TBCallback(logdir, histogram_freq=1))
 
 history = model.fit(cached_train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
 

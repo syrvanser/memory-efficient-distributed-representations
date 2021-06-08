@@ -32,10 +32,10 @@ class RankingModel(tf.keras.Model):
         self.ratings = tf.keras.Sequential([
               # Learn multiple dense layers.
               tf.keras.layers.Dense(args.mlp_1, activation="relu"),
-              # tf.keras.layers.Dropout(0.2),
+              tf.keras.layers.Dropout(0.2),
               tf.keras.layers.BatchNormalization(),
               tf.keras.layers.Dense(args.mlp_2, activation="relu"),
-              # tf.keras.layers.Dropout(0.2),
+              tf.keras.layers.Dropout(0.2),
               tf.keras.layers.BatchNormalization(),
               # Make rating predictions in the final layer.
               tf.keras.layers.Dense(1, activation="sigmoid")
