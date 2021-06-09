@@ -1,8 +1,6 @@
 import tensorflow as tf
 import tensorflow_recommenders as tfrs
 
-from keras.regularizers import l2
-
 from dpq_embedding import DPQEmbedding
 from typing import Dict, Text
 
@@ -33,15 +31,15 @@ class RankingModel(tf.keras.Model):
     # Compute predictions.
         self.ratings = tf.keras.Sequential([
               # Learn multiple dense layers.
-              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=l2(args.l2_norm), activation="relu"),
+              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
               #tf.keras.layers.Dropout(0.2),
               #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=l2(args.l2_norm), activation="relu"),
+              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
               #tf.keras.layers.Dropout(0.2),
               #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=l2(args.l2_norm), activation="relu"),
+              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
               # Make rating predictions in the final layer.
-              tf.keras.layers.Dense(1,  activity_regularizer=l2(args.l2_norm), activation="sigmoid")
+              tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid")
       ])
     
     def call(self, inputs):
