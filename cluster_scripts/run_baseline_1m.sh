@@ -36,17 +36,18 @@ source /home/${STUDENT_ID}/miniconda3/bin/activate medr
 cd ..
 
 #Params:
-epochs=50
-learning_rate=0.001
+epochs=10
+learning_rate=0.002
 batch_size=512
 embedding_dimensions=32
-num_negatives=4
-l2_norm=0.00002
-mlp_1=64
-mlp_2=32
+num_negatives=64
+l2_norm=0.005
+mlp_1=128
+mlp_2=64
+mlp_3=32
 dataset=1m
 exp_dir=mf_1m
 model=mf
 seed=0
 
-python main.py --batch_size=$batch_size --epochs=$epochs --learning_rate=$learning_rate --seed=$seed --embedding_dimensions=$embedding_dimensions --l2_norm=$l2_norm --num_negatives=$num_negatives --mlp_1=$mlp_1 --mlp_2=$mlp_2 --dataset=$dataset --exp_dir=$exp_dir --model=$model
+python main.py --batch_size=$batch_size --epochs=$epochs --learning_rate=$learning_rate --seed=$seed --embedding_dimensions=$embedding_dimensions --l2_norm=$l2_norm --num_negatives=$num_negatives --mlp_1=$mlp_1 --mlp_2=$mlp_2 --mlp_3=$mlp_3 --dataset=$dataset --exp_dir=$exp_dir --model=$model

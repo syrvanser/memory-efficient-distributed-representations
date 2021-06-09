@@ -39,8 +39,9 @@ parser.add_argument('--learning_rate', type=float, default=0.001)
 parser.add_argument('--l2_norm', type=float, default=0.00002)
 parser.add_argument('--embedding_dimensions', type=int, default=8)
 parser.add_argument('--num_negatives', type=int, default=4)
-parser.add_argument('--mlp_1', type=int, default=64)
-parser.add_argument('--mlp_2', type=int, default=32)
+parser.add_argument('--mlp_1', type=int, default=16)
+parser.add_argument('--mlp_2', type=int, default=8)
+parser.add_argument('--mlp_3', type=int, default=4)
 parser.add_argument('--dataset', type=str, default="100k")
 parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--exp_dir', type=str, default="temp")
@@ -139,10 +140,10 @@ cached_test = eval_test.batch(4096).cache()
 cached_validation = validation.batch(4096).cache()
 
 callbacks = []
-callbacks.append(tf.keras.callbacks.EarlyStopping(
-    monitor='val_total_loss', min_delta=0, patience=10, verbose=0,
-    mode='auto', baseline=None, restore_best_weights=True
-))
+# callbacks.append(tf.keras.callbacks.EarlyStopping(
+#     monitor='val_total_loss', min_delta=0, patience=10, verbose=0,
+#     mode='auto', baseline=None, restore_best_weights=True
+# ))
 
 checkpoint_filepath = os.path.join(exp_dir, 'checkpoints')
 
