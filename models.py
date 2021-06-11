@@ -14,7 +14,7 @@ class RankingModel(tf.keras.Model):
         self.user_embeddings = tf.keras.Sequential([
             tf.keras.layers.experimental.preprocessing.StringLookup(
               vocabulary=unique_user_ids, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_user_ids) + 1, args.embedding_dimensions, embeddings_initializer="he_normal",
+            tf.keras.layers.Embedding(len(unique_user_ids) + 1, args.embedding_dimensions, embeddings_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed),
                   embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
         ])
 
@@ -22,7 +22,7 @@ class RankingModel(tf.keras.Model):
         self.movie_embeddings = tf.keras.Sequential([
             tf.keras.layers.experimental.preprocessing.StringLookup(
                 vocabulary=unique_movie_ids, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_movie_ids) + 1, args.embedding_dimensions, embeddings_initializer="he_normal",
+            tf.keras.layers.Embedding(len(unique_movie_ids) + 1, args.embedding_dimensions, tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed),
                 embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
         ])
     
@@ -31,15 +31,15 @@ class RankingModel(tf.keras.Model):
     # Compute predictions.
         self.ratings = tf.keras.Sequential([
               # Learn multiple dense layers.
-              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
               #tf.keras.layers.Dropout(0.2),
               #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
               #tf.keras.layers.Dropout(0.2),
               #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
               # Make rating predictions in the final layer.
-              tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid")
+              tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed))
       ])
     
     def call(self, inputs):
@@ -89,15 +89,16 @@ class DPQRankingModel(tf.keras.Model):
     # Compute predictions.
         self.ratings = tf.keras.Sequential([
               # Learn multiple dense layers.
-              tf.keras.layers.Dense(args.mlp_1, activity_regularizer=l2(args.l2_norm), activation="relu"),
-              # tf.keras.layers.Dropout(0.2),
-              tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_2, activity_regularizer=l2(args.l2_norm), activation="relu"),
-              # tf.keras.layers.Dropout(0.2),
-              tf.keras.layers.BatchNormalization(),
+              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
+              #tf.keras.layers.Dropout(0.2),
+              #tf.keras.layers.BatchNormalization(),
+              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
+              #tf.keras.layers.Dropout(0.2),
+              #tf.keras.layers.BatchNormalization(),
+              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
               # Make rating predictions in the final layer.
-              tf.keras.layers.Dense(1, activity_regularizer=l2(args.l2_norm), activation="sigmoid")
-      ])
+              tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed))
+        ])
     
     def call(self, inputs):
         user_id, movie_id = inputs
@@ -112,8 +113,7 @@ class DPQMovielensModel(tfrs.models.Model):
         super().__init__()
         self.ranking_model: tf.keras.Model = DPQRankingModel(args, unique_user_ids, unique_movie_ids)
         self.task: tf.keras.layers.Layer = tfrs.tasks.Ranking(
-            loss = tf.keras.losses.BinaryCrossentropy(),
-            metrics=[tf.keras.metrics.BinaryCrossentropy()]
+            loss = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE),
       )
 
     def compute_loss(self, features: Dict[Text, tf.Tensor], training=False) -> tf.Tensor:
