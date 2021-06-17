@@ -11,43 +11,35 @@ class RankingModel(tf.keras.Model):
         super().__init__()
 
         # Compute embeddings for users.
-        self.user_embeddings = tf.keras.Sequential([
-            tf.keras.layers.experimental.preprocessing.StringLookup(
-              vocabulary=unique_user_ids, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_user_ids) + 1, args.embedding_dimensions, embeddings_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed),
-                  embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
-        ])
+        self.user_embeddings = tf.keras.layers.Embedding(len(unique_user_ids) + 1, args.embedding_dimensions, embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
 
-    # Compute embeddings for movies.
-        self.movie_embeddings = tf.keras.Sequential([
-            tf.keras.layers.experimental.preprocessing.StringLookup(
-                vocabulary=unique_movie_ids, mask_token=None),
-            tf.keras.layers.Embedding(len(unique_movie_ids) + 1, args.embedding_dimensions, tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed),
-                embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
-        ])
+        # Compute embeddings for movies.
+        self.movie_embeddings = tf.keras.layers.Embedding(len(unique_movie_ids) + 1, args.embedding_dimensions, embeddings_regularizer=tf.keras.regularizers.l2(args.l2_norm))
     
-        self.dot = tf.keras.layers.Dot(axes=1)
+        # self.dot = tf.keras.layers.Dot(axes=1)
 
-    # Compute predictions.
+        # Compute predictions.
         self.ratings = tf.keras.Sequential([
-              # Learn multiple dense layers.
-              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
-              #tf.keras.layers.Dropout(0.2),
-              #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
-              #tf.keras.layers.Dropout(0.2),
-              #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
-              # Make rating predictions in the final layer.
-              tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed))
-      ])
+            # Learn multiple dense layers.
+            tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.BatchNormalization(),
+            # Make rating predictions in the final layer.
+            tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid")
+        ])
     
     def call(self, inputs):
         user_id, movie_id = inputs
 
         user_embedding = self.user_embeddings(user_id)
         movie_embedding = self.movie_embeddings(movie_id)
-        return self.ratings(self.dot([user_embedding, movie_embedding]))
+        return self.ratings(tf.keras.layers.Multiply()([user_embedding, movie_embedding]))
 
 class MovielensModel(tfrs.models.Model):
 
@@ -56,13 +48,16 @@ class MovielensModel(tfrs.models.Model):
         self.ranking_model: tf.keras.Model = RankingModel(args, unique_user_ids, unique_movie_ids)
         self.task: tf.keras.layers.Layer = tfrs.tasks.Ranking(
             loss = tf.keras.losses.BinaryCrossentropy(reduction=tf.keras.losses.Reduction.NONE)
-      )
+        )
 
     def compute_loss(self, features: Dict[Text, tf.Tensor], training=False) -> tf.Tensor:
         rating_predictions = self.ranking_model(
             (features["user_id"], features["movie_id"]))
         # The task computes the loss and the metrics.
         return self.task(labels=features["user_rating"], predictions=rating_predictions)
+
+    def call(self, inputs):
+        return self.ranking_model(inputs)
 
 
 class DPQRankingModel(tf.keras.Model):
@@ -71,33 +66,27 @@ class DPQRankingModel(tf.keras.Model):
         super().__init__()
 
         # Compute embeddings for users.
-        self.user_embeddings = tf.keras.Sequential([
-            tf.keras.layers.experimental.preprocessing.StringLookup(
-              vocabulary=unique_user_ids, mask_token=None),
-            DPQEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions)
-        ])
+        self.user_embeddings = DPQEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm))
 
-    # Compute embeddings for movies.
-        self.movie_embeddings = tf.keras.Sequential([
-            tf.keras.layers.experimental.preprocessing.StringLookup(
-                vocabulary=unique_movie_ids, mask_token=None),
-            DPQEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions)
-        ])
+        # Compute embeddings for movies.
+        self.movie_embeddings = DPQEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm))
     
         self.dot = tf.keras.layers.Dot(axes=1)
 
-    # Compute predictions.
+        # Compute predictions.
         self.ratings = tf.keras.Sequential([
-              # Learn multiple dense layers.
-              tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
-              #tf.keras.layers.Dropout(0.2),
-              #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
-              #tf.keras.layers.Dropout(0.2),
-              #tf.keras.layers.BatchNormalization(),
-              tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed)),
-              # Make rating predictions in the final layer.
-              tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid", kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed), bias_initializer=tf.keras.initializers.RandomNormal(stddev=0.01, seed=args.seed))
+            # Learn multiple dense layers.
+            tf.keras.layers.Dense(args.mlp_1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Dense(args.mlp_2,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Dense(args.mlp_3,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="relu"),
+            tf.keras.layers.Dropout(0.3),
+            tf.keras.layers.BatchNormalization(),
+            # Make rating predictions in the final layer.
+            tf.keras.layers.Dense(1,  activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), activation="sigmoid")
         ])
     
     def call(self, inputs):
@@ -121,3 +110,6 @@ class DPQMovielensModel(tfrs.models.Model):
             (features["user_id"], features["movie_id"]))
         # The task computes the loss and the metrics.
         return self.task(labels=features["user_rating"], predictions=rating_predictions)
+
+    def call(self, inputs):
+        return self.ranking_model(inputs)

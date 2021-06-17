@@ -96,6 +96,18 @@ ratings = tfds.as_dataframe(ratings.take(-1))
 
 ratings['rank_latest'] = ratings.groupby(['user_id'])['timestamp'] \
                                 .rank(method='first', ascending=False)
+ratings[['user_id', 'movie_id']] = ratings[['user_id', 'movie_id']].apply(pd.to_numeric)
+
+unique_movie_ids = ratings['movie_id'].unique()
+unique_user_ids = ratings['user_id'].unique()
+
+user2user_encoded = {x: i for i, x in enumerate(unique_user_ids.tolist())}
+user_encoded2user = {i: x for i, x in enumerate(unique_user_ids.tolist())}
+movie2movie_encoded = {x: i for i, x in enumerate(unique_movie_ids.tolist())}
+movie_encoded2movie = {i: x for i, x in enumerate(unique_movie_ids.tolist())}
+
+ratings['user_id'] = ratings['user_id'].map(user2user_encoded)
+ratings['movie_id'] = ratings['movie_id'].map(movie2movie_encoded)
 
 unique_movie_ids = ratings['movie_id'].unique()
 unique_user_ids = ratings['user_id'].unique()
@@ -133,17 +145,17 @@ with mirrored_strategy.scope():
     elif args.model == "dpq": 
         model = DPQMovielensModel(args, unique_user_ids, unique_movie_ids)
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate))
-    model.ranking_model((["123"], ["42"]))
+    #model.ranking_model((["123"], ["42"]))
 
-cached_train = train.shuffle(args.ds_size, seed=args.seed).batch(args.batch_size).cache()
-cached_test = eval_test.batch(4096).cache()
+cached_train = train.shuffle(args.ds_size * (args.num_negatives + 1), seed=args.seed).batch(args.batch_size).cache()
+cached_test = eval_test.batch(4096).cache() 
 cached_validation = validation.batch(4096).cache()
 
 callbacks = []
-# callbacks.append(tf.keras.callbacks.EarlyStopping(
-#     monitor='val_total_loss', min_delta=0, patience=10, verbose=0,
-#     mode='auto', baseline=None, restore_best_weights=True
-# ))
+callbacks.append(tf.keras.callbacks.EarlyStopping(
+    monitor='val_total_loss', min_delta=0, patience=3, verbose=0,
+    mode='auto', baseline=None, restore_best_weights=True
+))
 
 checkpoint_filepath = os.path.join(exp_dir, 'checkpoints')
 
@@ -158,6 +170,7 @@ callbacks.append(tf.keras.callbacks.ModelCheckpoint(
 logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
 # callbacks.append(TBCallback(logdir, histogram_freq=1))
+# tf.debugging.experimental.enable_dump_debug_info(logdir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
 
 history = model.fit(cached_train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
 
@@ -169,7 +182,6 @@ plt.xlabel("epoch")
 plt.ylabel("loss")
 plt.legend()
 # plt.show()
-
 
 logging.info(model.evaluate(cached_test, return_dict=True))
 
@@ -185,12 +197,12 @@ for (u,i) in tqdm(test_user_item_set):
     not_interacted_items = set(unique_movie_ids) - set(interacted_items)
     selected_not_interacted = list(np.random.choice(list(not_interacted_items), 99))
     test_items = selected_not_interacted + [i]
-    random.shuffle(test_items)
+    #random.shuffle(test_items)
         
-    predicted_labels = model.ranking_model(([u]*100, test_items)).numpy().squeeze().tolist()
+    predicted_labels = model((np.array([u]*100), np.array(test_items))).numpy().squeeze().tolist()
     top10_items = [test_items[i] for i in np.argsort(predicted_labels)[::-1][0:10].tolist()]
     top10_filtered = [int(item == i) for item in top10_items]
-    
+
     if i in top10_items:
         hits.append(1)
     else:
