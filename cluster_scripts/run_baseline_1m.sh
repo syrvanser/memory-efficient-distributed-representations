@@ -48,6 +48,6 @@ mlp_3=16
 dataset=1m
 exp_dir=mf_1m
 model=mf
-seed=42
+seed=0
 
 python main.py --batch_size=$batch_size --epochs=$epochs --learning_rate=$learning_rate --seed=$seed --embedding_dimensions=$embedding_dimensions --l2_norm=$l2_norm --num_negatives=$num_negatives --mlp_1=$mlp_1 --mlp_2=$mlp_2 --mlp_3=$mlp_3 --dataset=$dataset --exp_dir=$exp_dir --model=$model

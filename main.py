@@ -47,7 +47,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--exp_dir', type=str, default="temp")
 parser.add_argument('--k', type=int, default=32)
 parser.add_argument('--d', type=int, default=8)
-parser.add_argument('--shared_centroids', type=bool, default=True)
+parser.add_argument('--shared_centroids', type=bool, default=False)
 parser.add_argument('--model', type=str, default="mf")
 parser.add_argument('--download', type=bool, default=False)
 
@@ -197,7 +197,7 @@ for (u,i) in tqdm(test_user_item_set):
     not_interacted_items = set(unique_movie_ids) - set(interacted_items)
     selected_not_interacted = list(np.random.choice(list(not_interacted_items), 99))
     test_items = selected_not_interacted + [i]
-    #random.shuffle(test_items)
+    random.shuffle(test_items)
         
     predicted_labels = model((np.array([u]*100), np.array(test_items))).numpy().squeeze().tolist()
     top10_items = [test_items[i] for i in np.argsort(predicted_labels)[::-1][0:10].tolist()]
@@ -207,7 +207,6 @@ for (u,i) in tqdm(test_user_item_set):
         hits.append(1)
     else:
         hits.append(0)
-
     ideal = [1] + [0] * 99
     ndcg_results.append(nDCG(top10_filtered, 10, ideal))
 

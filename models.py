@@ -71,8 +71,6 @@ class DPQRankingModel(tf.keras.Model):
         # Compute embeddings for movies.
         self.movie_embeddings = DPQEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm))
     
-        self.dot = tf.keras.layers.Dot(axes=1)
-
         # Compute predictions.
         self.ratings = tf.keras.Sequential([
             # Learn multiple dense layers.
@@ -94,7 +92,7 @@ class DPQRankingModel(tf.keras.Model):
 
         user_embedding = self.user_embeddings(user_id)
         movie_embedding = self.movie_embeddings(movie_id)
-        return self.ratings(self.dot([user_embedding, movie_embedding]))
+        return self.ratings(tf.keras.layers.Multiply()([user_embedding, movie_embedding]))
 
 class DPQMovielensModel(tfrs.models.Model):
 
