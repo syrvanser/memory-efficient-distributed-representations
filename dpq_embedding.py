@@ -13,7 +13,7 @@ class DPQEmbedding(tf.keras.layers.Layer):
         self.d = d
         self.sub_size = embebdding_size//d
         self.query_wemb = self.add_weight(name='emb_table', shape=[self.vocab_size, self.embedding_size], dtype=tf.float32, initializer="he_normal", trainable=True)
-        print("emb shape:", self.vocab_size, self.embedding_size)
+        #print("emb shape:", self.vocab_size, self.embedding_size)
         self.kdq = KDQuantizer(self.k, self.d, self.sub_size, self.share_subspace)
 
     def call(self, inputs, training=None): # was D * subs_size before TODO
@@ -54,7 +54,7 @@ class KDQuantizer(tf.keras.layers.Layer):
         # Create centroids for keys and values.
         d_to_create = 1 if shared_centroids else d
         self.centroids_k = self.add_weight(name='centroids', shape=[d_to_create, k, sub_size], initializer="random_normal", trainable = True)
-        print("centroids_shape:", d_to_create, k, sub_size)
+        #print("centroids_shape:", d_to_create, k, sub_size)
 
         if shared_centroids:
             self.centroids_k = tf.tile(self.centroids_k, [d, 1, 1])
@@ -133,7 +133,7 @@ class MGQEEmbedding(tf.keras.layers.Layer):
         name="partitions"
         )
 
-        print(head.head())
+        #print(head.head())
         
 
         self.k = k
@@ -144,11 +144,11 @@ class MGQEEmbedding(tf.keras.layers.Layer):
 
     def call(self, inputs, training=None): # was D * subs_size before TODO
         inputs = tf.cast(inputs, tf.int32)
-        print("shape: ", inputs.shape)
+        #print("shape: ", inputs.shape)
         idxs = tf.reshape(inputs, [-1]) #flatten 
-        print(idxs)
+        #print(idxs)
         partitions = tf.map_fn(fn=lambda t: self.dictionary[t], elems=idxs)
-        print(partitions)
+        #print(partitions)
         input_emb = tf.nn.embedding_lookup(self.query_wemb, idxs) 
         _, input_emb = self.kdq(input_emb, partitions=partitions, training=training)
         final_size = tf.concat([tf.shape(inputs), tf.constant([self.embedding_size])], 0)
@@ -202,7 +202,7 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
         # Compute distance (in a metric) between inputs and centroids_k
         # the response is in the shape of (batch_size, D, K)
         #available_centroids = tf.slice(self.centroids_k, [0, 0, 0], [0, self.k, 0])
-        print(inputs.shape)
+        #print(inputs.shape)
         
  
         inputs_head_ids = tf.where(tf.equal(partitions, self.k))
@@ -239,7 +239,7 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
         combined = tf.concat([codes_head, codes_tails], 0)
         codes = tf.gather(combined, tf.argsort(tf.concat([inputs_head_ids, inputs_tail_ids], 0)))
        
-        print("resp", response.shape)
+        #print("resp", response.shape)
         
 
         # Compute the codes based on response.
