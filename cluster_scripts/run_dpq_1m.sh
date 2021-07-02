@@ -2,7 +2,7 @@
 #SBATCH -N 1	  # nodes requested
 #SBATCH -n 1	  # tasks requested
 #SBATCH --partition=Teach-Standard
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:4
 #SBATCH --mem=12000  # memory in Mb
 #SBATCH --time=0-08:00:00
 
@@ -36,11 +36,11 @@ source /home/${STUDENT_ID}/miniconda3/bin/activate medr
 cd ..
 
 #Params:
-epochs=20
-learning_rate=0.0001
-batch_size=512
+epochs=30
+learning_rate=0.00005
+batch_size=256
 embedding_dimensions=32
-num_negatives=4
+num_negatives=7
 l2_norm=1e-05
 mlp_1=64
 mlp_2=32

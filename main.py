@@ -25,8 +25,8 @@ tf.autograph.set_verbosity(1)
 
 import random
 
-from models import MovielensModel, DPQMovielensModel
-from utils import nDCG, augment_data
+from models import MovielensModel, DPQMovielensModel, MGQEMovielensModel, NeuMFMovielensModel
+from utils import NegativeSamplingDatasetWrapper, nDCG, augment_data
 from callback import TBCallback
 
 # %matplotlib inline
@@ -57,7 +57,7 @@ args = parser.parse_args()
 random.seed(args.seed)
 tf.random.set_seed(args.seed)
 np.random.seed(args.seed)
-os.environ['TF_DETERMINISTIC_OPS'] = '1'
+#os.environ['TF_DETERMINISTIC_OPS'] = '1'
 
 if args.dataset == "100k":
     dataset = "movielens/100k-ratings"
@@ -76,7 +76,6 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 exp_dir = os.path.join(dir_path, 'results', args.exp_dir)
 os.makedirs(exp_dir, exist_ok=True)
 
-# now make variables for all the relevant files we'll make
 log_path = os.path.join(exp_dir, 'log.log')
 #logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s",)
@@ -122,21 +121,19 @@ test = test[['user_id', 'movie_id', 'user_rating']]
 validation = validation[['user_id', 'movie_id', 'user_rating']]
 train.loc[:, 'user_rating'] = 1
 
+#train = augment_data(train, unique_movie_ids, args.num_negatives)
+train = NegativeSamplingDatasetWrapper(train, args, unique_movie_ids)
+#validation = augment_data(validation, unique_movie_ids, args.num_negatives)
 
-train = augment_data(train, unique_movie_ids, args.num_negatives)
-train = train.to_dict("list")
-train = {name: np.array(value) for name, value in train.items()}
-train = tf.data.Dataset.from_tensor_slices(train)
-
-validation = augment_data(validation, unique_movie_ids, args.num_negatives)
-
-validation = validation.to_dict("list")
-validation = {name: np.array(value) for name, value in validation.items()}
+validation = pd.DataFrame.from_dict(validation).to_dict("list")
+validation = {name: np.array(value, dtype=np.int32) for name, value in validation.items()}
+print(validation)
+print(len(validation['user_id']))
 validation = tf.data.Dataset.from_tensor_slices(validation)
 
-eval_test = test.to_dict("list")
-eval_test = {name: np.array(value) for name, value in eval_test.items()}
-eval_test = tf.data.Dataset.from_tensor_slices(eval_test)
+# eval_test = test.to_dict("list")
+# eval_test = {name: np.array(value) for name, value in eval_test.items()}
+# eval_test = tf.data.Dataset.from_tensor_slices(eval_test)
 
 mirrored_strategy = tf.distribute.MirroredStrategy()
 with mirrored_strategy.scope():
@@ -144,16 +141,30 @@ with mirrored_strategy.scope():
         model = MovielensModel(args, unique_user_ids, unique_movie_ids)
     elif args.model == "dpq": 
         model = DPQMovielensModel(args, unique_user_ids, unique_movie_ids)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate))
+    elif args.model == "mgqe":
+        user_freq = ratings[['user_id','movie_id']].groupby('user_id').agg('count')
+        user_freq = user_freq.sort_values(by=['movie_id'])
+        user_freq.reset_index(level=0, inplace=True)
+        user_freq = user_freq.rename(columns={"user_id": "id", "movie_id": "freq"})
+        movie_freq = ratings[['user_id','movie_id']].groupby('movie_id').agg('count')
+        movie_freq = movie_freq.sort_values(by=['user_id'])
+        movie_freq.reset_index(level=0, inplace=True)
+        movie_freq = movie_freq.rename(columns={"movie_id": "id", "user_id": "freq"})
+        
+        model = MGQEMovielensModel(args, unique_user_ids, unique_movie_ids, user_freq, movie_freq)
+    elif args.model == "neumf":
+        model = NeuMFMovielensModel(args, unique_user_ids, unique_movie_ids)
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(args.learning_rate, decay_steps=100000, decay_rate=0.96, staircase=True)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule))
+
     #model.ranking_model((["123"], ["42"]))
 
-cached_train = train.shuffle(args.ds_size * (args.num_negatives + 1), seed=args.seed).batch(args.batch_size).cache()
-cached_test = eval_test.batch(4096).cache() 
-cached_validation = validation.batch(4096).cache()
+#cached_test = eval_test.batch(4096).cache() 
+cached_validation = validation.batch(10000000).cache()
 
 callbacks = []
 callbacks.append(tf.keras.callbacks.EarlyStopping(
-    monitor='val_total_loss', min_delta=0, patience=3, verbose=0,
+    monitor='val_total_loss', min_delta=0, patience=5, verbose=0,
     mode='auto', baseline=None, restore_best_weights=True
 ))
 
@@ -171,8 +182,7 @@ logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
 # callbacks.append(TBCallback(logdir, histogram_freq=1))
 # tf.debugging.experimental.enable_dump_debug_info(logdir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
-
-history = model.fit(cached_train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
+history = model.fit(train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
 
 epochs_list = [(x+1) for x in range(len(history.history["val_total_loss"]))]
 plt.plot(epochs_list, history.history["val_total_loss"], label="validation loss")
@@ -183,7 +193,6 @@ plt.ylabel("loss")
 plt.legend()
 # plt.show()
 
-logging.info(model.evaluate(cached_test, return_dict=True))
 
 test_user_item_set = set(zip(test['user_id'], test['movie_id']))
 

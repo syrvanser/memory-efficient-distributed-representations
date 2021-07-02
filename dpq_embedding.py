@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+from collections import defaultdict
 
 class DPQEmbedding(tf.keras.layers.Layer):
 
@@ -26,7 +27,7 @@ class DPQEmbedding(tf.keras.layers.Layer):
         return input_emb
 
 class KDQuantizer(tf.keras.layers.Layer):
-    def __init__(self, k, d, dim_size, shared_centroids=False, beta=0., tau=1.0, **kwargs):
+    def __init__(self, k, d, sub_size, shared_centroids=False, beta=0., tau=1.0, **kwargs):
         """
             Args:
             K, D: int, size of KD code.
@@ -45,15 +46,15 @@ class KDQuantizer(tf.keras.layers.Layer):
         super(KDQuantizer, self).__init__(**kwargs)
         self.k = k
         self.d = d
-        self.dim_size = dim_size
+        self.sub_size = sub_size
         self.shared_centroids = shared_centroids
         self.beta = beta
         self.tau = tf.constant(tau)
 
         # Create centroids for keys and values.
         d_to_create = 1 if shared_centroids else d
-        self.centroids_k = self.add_weight(name='centroids', shape=[d_to_create, k, dim_size], initializer="random_normal", trainable = True)
-        print("centroids_shape:", d_to_create, k, dim_size)
+        self.centroids_k = self.add_weight(name='centroids', shape=[d_to_create, k, sub_size], initializer="random_normal", trainable = True)
+        print("centroids_shape:", d_to_create, k, sub_size)
 
         if shared_centroids:
             self.centroids_k = tf.tile(self.centroids_k, [d, 1, 1])
@@ -86,12 +87,12 @@ class KDQuantizer(tf.keras.layers.Layer):
         # Compute the outputs, which has shape (batch_size, D, d_out)
         if not self.shared_centroids:
             D_base = tf.convert_to_tensor(
-                [self.k * d for d in range(self.d)], dtype=tf.int64)
+                [self.k * d for d in range(self.d)], dtype=tf.int32)
             neighbor_idxs += tf.expand_dims(D_base, 0)  # (batch_size, D)
         neighbor_idxs = tf.reshape(neighbor_idxs, [-1])  # (batch_size * D)
-        centroids_k = tf.reshape(self.centroids_k, [-1, self.dim_size])
+        centroids_k = tf.reshape(self.centroids_k, [-1, self.sub_size])
         outputs = tf.nn.embedding_lookup(centroids_k, neighbor_idxs)
-        outputs = tf.reshape(outputs, [-1, self.d, self.dim_size])
+        outputs = tf.reshape(outputs, [-1, self.d, self.sub_size])
         outputs_final = tf.stop_gradient(outputs - inputs) + inputs
         
         # Add regularization for updating centroids / stabilization.
@@ -106,39 +107,56 @@ class KDQuantizer(tf.keras.layers.Layer):
             minaxis = [0, 1] if self.shared_centroids else [0]
             reg += gamma * tf.reduce_mean(  # could sg(inputs), but still not eff.
                 tf.reduce_min(-response, minaxis), name="de_isolation")
-        
-            # entropy regularization
-            # reg = - beta * tf.reduce_mean(
-            #    tf.reduce_sum(response_prob * safer_log(response_prob), [2]))
+    
             self.add_loss(reg)
 
         return codes, outputs_final
 
 class MGQEEmbedding(tf.keras.layers.Layer):
 
-    def __init__(self, k, d, vocab_size, embebdding_size, share_subspace=False, **kwargs):
-        super(DPQEmbedding, self).__init__(**kwargs)
+    def __init__(self, k, d, vocab_size, embebdding_size, frequencies, share_subspace=False, **kwargs):
+        super(MGQEEmbedding, self).__init__(**kwargs)
         self.vocab_size = vocab_size
         self.embedding_size = embebdding_size
         self.share_subspace = share_subspace
+        n = 90
+        cutoff = int(len(frequencies)*(n/100))
+        tail = frequencies[:cutoff]
+        head = frequencies[cutoff:]
+        
+        self.dictionary = tf.lookup.StaticHashTable(
+        initializer=tf.lookup.KeyValueTensorInitializer(
+            keys=tf.constant( head['id'].tolist() + tail['id'].tolist()),
+            values=tf.constant([k] * len(head) + [k//2] * len(tail)),
+        ),
+        default_value=tf.constant(k),
+        name="partitions"
+        )
+
+        print(head.head())
+        
+
         self.k = k
         self.d = d
         self.sub_size = embebdding_size//d
         self.query_wemb = self.add_weight(name='emb_table', shape=[self.vocab_size, self.embedding_size], dtype=tf.float32, initializer="he_normal", trainable=True)
-        self.kdq = PartialKDQuantizer(self.k, self.d, self.sub_size, self.share_subspace)
+        self.kdq = PartialKDQuantizer(self.k, self.d, self.sub_size, self.dictionary, self.share_subspace)
 
     def call(self, inputs, training=None): # was D * subs_size before TODO
+        inputs = tf.cast(inputs, tf.int32)
+        print("shape: ", inputs.shape)
         idxs = tf.reshape(inputs, [-1]) #flatten 
-
+        print(idxs)
+        partitions = tf.map_fn(fn=lambda t: self.dictionary[t], elems=idxs)
+        print(partitions)
         input_emb = tf.nn.embedding_lookup(self.query_wemb, idxs) 
-
-        _, input_emb = self.kdq(tf.reshape(input_emb, [-1, self.d, self.sub_size]), training=training)
+        _, input_emb = self.kdq(input_emb, partitions=partitions, training=training)
         final_size = tf.concat([tf.shape(inputs), tf.constant([self.embedding_size])], 0)
         input_emb = tf.reshape(input_emb, final_size)
         return input_emb
 
 class PartialKDQuantizer(tf.keras.layers.Layer):
-    def __init__(self, k, d, dim_size, shared_centroids=False, beta=0., tau=1.0, **kwargs):
+    def __init__(self, k, d, sub_size, dictionary, shared_centroids=False, beta=0., tau=1.0, **kwargs):
         """
             Args:
             K, D: int, size of KD code.
@@ -154,55 +172,90 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
                 If None, set to learnable.
             softmax_BN: whether to use BN in (tempering) softmax.
         """
-        super(KDQuantizer, self).__init__(**kwargs)
+        super(PartialKDQuantizer, self).__init__(**kwargs)
         self.k = k
         self.d = d
-        self.dim_size = dim_size
+        self.sub_size = sub_size
         self.shared_centroids = shared_centroids
         self.beta = beta
         self.tau = tf.constant(tau)
+        self.dictionary = dictionary
 
         # Create centroids for keys and values.
         d_to_create = 1 if shared_centroids else d
-        self.centroids_k = self.add_weight(name='centroids', shape=[d_to_create, k, dim_size], initializer="random_normal", trainable = True)
+        self.centroids_k = self.add_weight(name='centroids', shape=[d_to_create, k, sub_size], initializer="random_normal", trainable = True)
         
         if shared_centroids:
             self.centroids_k = tf.tile(self.centroids_k, [d, 1, 1])
 
-        self.batch_norm = tf.keras.layers.BatchNormalization(scale=False, center=False)
+        self.batch_norm1 = tf.keras.layers.BatchNormalization(scale=False, center=False)
+        self.batch_norm2 = tf.keras.layers.BatchNormalization(scale=False, center=False)
 
-    def call(self, inputs, training=True):
+    def call(self, inputs, partitions, training=True):
         """Returns quantized embeddings from centroids.
         Args:
-        inputs: embedding tensor of shape (batch_size, D, d_in)
+        inputs: embedding tensor of shape (batch_size, D, d_in)  256 * dims(32)
         Returns:
         code: (batch_size, D)
         embs_quantized: (batch_size, D, d_out)
         """
-
         # Compute distance (in a metric) between inputs and centroids_k
         # the response is in the shape of (batch_size, D, K)
-        norm_1 = tf.math.reduce_sum(inputs**2, -1, keepdims=True)  # (bs, D, 1)
-        norm_2 = tf.expand_dims(tf.reduce_sum(self.centroids_k**2, -1), 0)  # (1, D, K)
-        dot = tf.matmul(tf.transpose(inputs, perm=[1, 0, 2]),
-                        tf.transpose(self.centroids_k, perm=[0, 2, 1]))  # (D, bs, K)
+        #available_centroids = tf.slice(self.centroids_k, [0, 0, 0], [0, self.k, 0])
+        print(inputs.shape)
+        
+ 
+        inputs_head_ids = tf.where(tf.equal(partitions, self.k))
+        inputs_tail_ids = tf.where(tf.equal(partitions, self.k//2))
+        head = tf.gather(inputs, inputs_head_ids)
+        tail = tf.gather(inputs, inputs_tail_ids)
+        inputs = tf.reshape(inputs, [-1, self.d, self.sub_size])
+        # print(available_centroids.shape)
+        available_centroids = tf.slice(self.centroids_k, [0, 0, 0], [-1, self.k, -1])
+        head = tf.reshape(head, [-1, self.d, self.sub_size])
+        norm_1 = tf.math.reduce_sum(head**2, -1, keepdims=True)  # (bs, D, 1)
+        norm_2 = tf.expand_dims(tf.reduce_sum(available_centroids**2, -1), 0)  # (1, D, K)
+        dot = tf.matmul(tf.transpose(head, perm=[1, 0, 2]),
+                        tf.transpose(available_centroids, perm=[0, 2, 1]))  # (D, bs, K)
         response = -norm_1 + 2 * tf.transpose(dot, perm=[1, 0, 2]) - norm_2
         response = tf.reshape(response, [-1, self.d, self.k])
-        response = self.batch_norm(response, training=training)
+        response = self.batch_norm1(response, training=training)
+        codes_head = tf.argmax(response, -1, output_type=tf.int32)
+        
+        available_centroids = tf.slice(self.centroids_k, [0, 0, 0], [-1, self.k//2, -1])
+
+        # print(available_centroids.shape)
+        tail = tf.reshape(tail, [-1, self.d, self.sub_size])
+        norm_1 = tf.math.reduce_sum(tail**2, -1, keepdims=True)  # (bs, D, 1)
+        norm_2 = tf.expand_dims(tf.reduce_sum(available_centroids**2, -1), 0)  # (1, D, K)
+        dot = tf.matmul(tf.transpose(tail, perm=[1, 0, 2]),
+                        tf.transpose(available_centroids, perm=[0, 2, 1]))  # (D, bs, K)
+        response = -norm_1 + 2 * tf.transpose(dot, perm=[1, 0, 2]) - norm_2
+        response = tf.reshape(response, [-1, self.d, self.k//2])
+        response = self.batch_norm2(response, training=training)
+        codes_tails = tf.argmax(response, -1, output_type=tf.int32)
+
+        #print("tail ", response_tail.shape)
+        combined = tf.concat([codes_head, codes_tails], 0)
+        codes = tf.gather(combined, tf.argsort(tf.concat([inputs_head_ids, inputs_tail_ids], 0)))
+       
+        print("resp", response.shape)
+        
 
         # Compute the codes based on response.
-        codes = tf.argmax(response, -1)  # (batch_size, D)
+
         neighbor_idxs = codes
 
         # Compute the outputs, which has shape (batch_size, D, d_out)
         if not self.shared_centroids:
             D_base = tf.convert_to_tensor(
-                [self.k * d for d in range(self.d)], dtype=tf.int64)
+                [self.k * d for d in range(self.d)], dtype=tf.int32)
             neighbor_idxs += tf.expand_dims(D_base, 0)  # (batch_size, D)
         neighbor_idxs = tf.reshape(neighbor_idxs, [-1])  # (batch_size * D)
-        centroids_k = tf.reshape(self.centroids_k, [-1, self.dim_size])
+        centroids_k = tf.reshape(self.centroids_k, [-1, self.sub_size])
+        
         outputs = tf.nn.embedding_lookup(centroids_k, neighbor_idxs)
-        outputs = tf.reshape(outputs, [-1, self.d, self.dim_size])
+        outputs = tf.reshape(outputs, [-1, self.d, self.sub_size])
         outputs_final = tf.stop_gradient(outputs - inputs) + inputs
         
         # Add regularization for updating centroids / stabilization.
@@ -218,17 +271,15 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
             reg += gamma * tf.reduce_mean(  # could sg(inputs), but still not eff.
                 tf.reduce_min(-response, minaxis), name="de_isolation")
         
-            # entropy regularization
-            # reg = - beta * tf.reduce_mean(
-            #    tf.reduce_sum(response_prob * safer_log(response_prob), [2]))
             self.add_loss(reg)
+        
 
         return codes, outputs_final
 
 if __name__ == "__main__":
     # VQ
-    kdq_demo = DPQEmbedding(4, 8, 50, 64, True)
-    result = kdq_demo(tf.zeros([1, 100]), training=True)
+    kdq_demo = MGQEEmbedding(4, 8, 50, 64, None, False)
+    result = kdq_demo(tf.zeros([1, 100], dtype=tf.dtypes.int32), training=True)
     print(result)
     print("vars:")
     print(kdq_demo.trainable_variables)
