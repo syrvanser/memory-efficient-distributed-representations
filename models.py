@@ -73,10 +73,10 @@ class DPQRankingModel(tf.keras.Model):
         super().__init__()
 
         # Compute embeddings for users.
-        self.user_embeddings = DPQEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), share_subspace=args.share_subspace)
+        self.user_embeddings = DPQEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), share_subspace=args.shared_centroids)
 
         # Compute embeddings for movies.
-        self.movie_embeddings = DPQEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), share_subspace=args.share_subspace)
+        self.movie_embeddings = DPQEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), share_subspace=args.shared_centroids)
     
         # Compute predictions.
         self.ratings = tf.keras.Sequential([
