@@ -127,8 +127,8 @@ train = NegativeSamplingDatasetWrapper(train, args, unique_movie_ids)
 
 validation = pd.DataFrame.from_dict(validation).to_dict("list")
 validation = {name: np.array(value, dtype=np.int32) for name, value in validation.items()}
-print(validation)
-print(len(validation['user_id']))
+# print(validation)
+# print(len(validation['user_id']))
 validation = tf.data.Dataset.from_tensor_slices(validation)
 
 # eval_test = test.to_dict("list")

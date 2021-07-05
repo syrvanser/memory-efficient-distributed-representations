@@ -41,7 +41,7 @@ def augment_data(data, unique_movie_ids, num_negatives=4):
             labels.append(0) # items not interacted with are negative
     # tf.print(tf.convert_to_tensor(users, dtype=tf.int64))
     shuffled = list(zip(users, items, labels))
-    print(shuffled[0:5])
+    #print(shuffled[0:5])
     random.shuffle(shuffled)
     users, items, labels = zip(*shuffled)
     #tf.print({'user_id': tf.concat([data['user_id'], tf.convert_to_tensor(users, dtype=tf.int64)], axis=0), 'movie_id':  tf.concat([data['user_id'], tf.convert_to_tensor(items, dtype=tf.int64)], axis=0), 'user_rating':  tf.concat([data['user_id'], tf.convert_to_tensor(labels, dtype=tf.int64)], axis=0)})
@@ -66,7 +66,7 @@ class NegativeSamplingDatasetWrapper(tf.keras.utils.Sequence):
         return math.ceil(len(self.current['user_id']) / self.batch_size)
 
     def on_epoch_end(self):
-        print('on_epoch_end')
+        #print('on_epoch_end')
         self.current = augment_data(self.positives, self.unique_movie_ids, self.args.num_negatives)
 
     def __getitem__(self, idx):

@@ -17,6 +17,7 @@ class DPQEmbedding(tf.keras.layers.Layer):
         self.kdq = KDQuantizer(self.k, self.d, self.sub_size, self.share_subspace)
 
     def call(self, inputs, training=None): # was D * subs_size before TODO
+        inputs = tf.cast(inputs, tf.int32)
         idxs = tf.reshape(inputs, [-1]) #flatten 
 
         input_emb = tf.nn.embedding_lookup(self.query_wemb, idxs) 
@@ -81,7 +82,7 @@ class KDQuantizer(tf.keras.layers.Layer):
         response = self.batch_norm(response, training=training)
 
         # Compute the codes based on response.
-        codes = tf.argmax(response, -1)  # (batch_size, D)
+        codes = tf.argmax(response, -1, output_type=tf.int32)  # (batch_size, D)
         neighbor_idxs = codes
 
         # Compute the outputs, which has shape (batch_size, D, d_out)
