@@ -1,7 +1,6 @@
 #!/bin/bash
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate medr
-
 epochs=30
 learning_rate=0.00005
 batch_size=256

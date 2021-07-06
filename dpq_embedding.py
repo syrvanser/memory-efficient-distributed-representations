@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import pandas as pd
 from collections import defaultdict
 
 class DPQEmbedding(tf.keras.layers.Layer):
@@ -70,7 +71,6 @@ class KDQuantizer(tf.keras.layers.Layer):
         code: (batch_size, D)
         embs_quantized: (batch_size, D, d_out)
         """
-
         # Compute distance (in a metric) between inputs and centroids_k
         # the response is in the shape of (batch_size, D, K)
         norm_1 = tf.math.reduce_sum(inputs**2, -1, keepdims=True)  # (bs, D, 1)
@@ -208,12 +208,15 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
  
         inputs_head_ids = tf.where(tf.equal(partitions, self.k))
         inputs_tail_ids = tf.where(tf.equal(partitions, self.k//2))
+
         head = tf.gather(inputs, inputs_head_ids)
         tail = tf.gather(inputs, inputs_tail_ids)
+
         inputs = tf.reshape(inputs, [-1, self.d, self.sub_size])
         # print(available_centroids.shape)
         available_centroids = tf.slice(self.centroids_k, [0, 0, 0], [-1, self.k, -1])
         head = tf.reshape(head, [-1, self.d, self.sub_size])
+
         norm_1 = tf.math.reduce_sum(head**2, -1, keepdims=True)  # (bs, D, 1)
         norm_2 = tf.expand_dims(tf.reduce_sum(available_centroids**2, -1), 0)  # (1, D, K)
         dot = tf.matmul(tf.transpose(head, perm=[1, 0, 2]),
@@ -222,10 +225,9 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
         response = tf.reshape(response, [-1, self.d, self.k])
         response = self.batch_norm1(response, training=training)
         codes_head = tf.argmax(response, -1, output_type=tf.int32)
-        
+
         available_centroids = tf.slice(self.centroids_k, [0, 0, 0], [-1, self.k//2, -1])
 
-        # print(available_centroids.shape)
         tail = tf.reshape(tail, [-1, self.d, self.sub_size])
         norm_1 = tf.math.reduce_sum(tail**2, -1, keepdims=True)  # (bs, D, 1)
         norm_2 = tf.expand_dims(tf.reduce_sum(available_centroids**2, -1), 0)  # (1, D, K)
@@ -236,12 +238,9 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
         response = self.batch_norm2(response, training=training)
         codes_tails = tf.argmax(response, -1, output_type=tf.int32)
 
-        #print("tail ", response_tail.shape)
         combined = tf.concat([codes_head, codes_tails], 0)
-        codes = tf.gather(combined, tf.argsort(tf.concat([inputs_head_ids, inputs_tail_ids], 0)))
-       
-        #print("resp", response.shape)
-        
+        order = tf.reshape(tf.argsort(tf.concat([inputs_head_ids, inputs_tail_ids], 0), 0), [-1])
+        codes = tf.gather(combined, order)
 
         # Compute the codes based on response.
 
@@ -279,8 +278,10 @@ class PartialKDQuantizer(tf.keras.layers.Layer):
 
 if __name__ == "__main__":
     # VQ
-    kdq_demo = MGQEEmbedding(4, 8, 50, 64, None, False)
-    result = kdq_demo(tf.zeros([1, 100], dtype=tf.dtypes.int32), training=True)
-    print(result)
-    print("vars:")
-    print(kdq_demo.trainable_variables)
+    freq = pd.DataFrame({'id': [0, 1],'freq': [1, 10]})
+    kdq_demo = MGQEEmbedding(8, 4, 2, 4, freq, False)
+    #kdq_demo = DPQEmbedding(8, 4, 2, 4, False)
+    result = kdq_demo(tf.concat([tf.fill([3], 0), tf.fill([3], 1)], axis=0), training=False)
+    #print(result)
+    #print("vars:")
+    #print(kdq_demo.trainable_variables)
