@@ -185,16 +185,17 @@ logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 # tf.debugging.experimental.enable_dump_debug_info(logdir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
 if args.continue_from_checkpoint != 0:
     print("model loaded from checkpoint")
-    model = tf.keras.models.load_model(checkpoint_filepath)
-history = model.fit(train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
+    model.load_weights(checkpoint_filepath)
+    #model = tf.keras.models.load_model(checkpoint_filepath)
+#history = model.fit(train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
 
-epochs_list = [(x+1) for x in range(len(history.history["val_total_loss"]))]
-plt.plot(epochs_list, history.history["val_total_loss"], label="validation loss")
-plt.plot(epochs_list, history.history["total_loss"], label="training loss")
-plt.title("Loss vs epoch")
-plt.xlabel("epoch")
-plt.ylabel("loss")
-plt.legend()
+# epochs_list = [(x+1) for x in range(len(history.history["val_total_loss"]))]
+# plt.plot(epochs_list, history.history["val_total_loss"], label="validation loss")
+# plt.plot(epochs_list, history.history["total_loss"], label="training loss")
+# plt.title("Loss vs epoch")
+# plt.xlabel("epoch")
+# plt.ylabel("loss")
+# plt.legend()
 # plt.show()
 
 
