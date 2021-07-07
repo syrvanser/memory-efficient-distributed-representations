@@ -50,6 +50,7 @@ parser.add_argument('--d', type=int, default=8)
 parser.add_argument('--shared_centroids', type=bool, default=False)
 parser.add_argument('--model', type=str, default="mf")
 parser.add_argument('--download', type=bool, default=False)
+parser.add_argument('--continue_from_checkpoint', type=int, default=0)
 
 
 args = parser.parse_args()
@@ -172,7 +173,7 @@ checkpoint_filepath = os.path.join(exp_dir, 'checkpoints')
 
 callbacks.append(tf.keras.callbacks.ModelCheckpoint(
     filepath=checkpoint_filepath,
-    save_weights_only=True,
+    save_weights_only=False,
     monitor='val_total_loss',
     mode='min',
     save_best_only=True)
@@ -182,6 +183,9 @@ logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
 # callbacks.append(TBCallback(logdir, histogram_freq=1))
 # tf.debugging.experimental.enable_dump_debug_info(logdir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
+if args.continue_from_checkpoint != 0:
+    print("model loaded from checkpoint")
+    model = tf.keras.models.load_model(checkpoint_filepath)
 history = model.fit(train, epochs=args.epochs, verbose=1, validation_data=cached_validation, callbacks=callbacks)
 
 epochs_list = [(x+1) for x in range(len(history.history["val_total_loss"]))]
