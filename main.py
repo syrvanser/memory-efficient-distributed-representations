@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-whitegrid')
 
 from tqdm import tqdm
+from sklearn.preprocessing import normalize
 
 import logging
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
@@ -26,7 +27,7 @@ tf.autograph.set_verbosity(1)
 import random
 
 from models import MovielensModel, DPQMovielensModel, MGQEMovielensModel, NeuMFMovielensModel
-from utils import NegativeSamplingDatasetWrapper, nDCG, augment_data
+from utils import NegativeSamplingDatasetWrapper, nDCG
 from callback import TBCallback
 
 # %matplotlib inline
@@ -51,6 +52,7 @@ parser.add_argument('--shared_centroids', type=bool, default=False)
 parser.add_argument('--model', type=str, default="mf")
 parser.add_argument('--download', type=bool, default=False)
 parser.add_argument('--continue_from_checkpoint', type=int, default=0)
+parser.add_argument('--partitions', type=int, default=2)
 
 
 args = parser.parse_args()
@@ -122,8 +124,14 @@ test = test[['user_id', 'movie_id', 'user_rating']]
 validation = validation[['user_id', 'movie_id', 'user_rating']]
 train.loc[:, 'user_rating'] = 1
 
+
+distribution = train['movie_id'].value_counts().sort_index()
+p = np.asarray(distribution).astype('float64')
+p = p / np.sum(p)
+
+
 #train = augment_data(train, unique_movie_ids, args.num_negatives)
-train = NegativeSamplingDatasetWrapper(train, args, unique_movie_ids)
+train = NegativeSamplingDatasetWrapper(train, args, train['movie_id'].unique(), p)
 #validation = augment_data(validation, unique_movie_ids, args.num_negatives)
 
 validation = pd.DataFrame.from_dict(validation).to_dict("list")

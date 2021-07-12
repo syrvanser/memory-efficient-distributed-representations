@@ -1,10 +1,7 @@
 import math
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 import random
-
-from tqdm import tqdm
 
 def nDCG(docs, n, ideal_docs):
     gain_sum = docs[0] 
@@ -21,7 +18,7 @@ def hit_ratio_at_n(docs, n):
             return 1
     return 0
 
-def augment_data(data, unique_movie_ids, num_negatives=4):
+def augment_data(data, unique_movie_ids, num_negatives=4, distribution = None):
     users, items, labels = [], [], []
     # This is the set of items that each user has interaction with
     user_item_set = set(zip(data['user_id'], data['movie_id']))
@@ -32,10 +29,10 @@ def augment_data(data, unique_movie_ids, num_negatives=4):
         labels.append(1) # items that the user has interacted with are positive
         for _ in range(num_negatives):
             # randomly select an item
-            negative_item = np.random.choice(unique_movie_ids) 
+            negative_item = np.random.choice(unique_movie_ids, p=distribution) 
             # check that the user has not interacted with this item
             while (u, negative_item) in user_item_set:
-                negative_item = np.random.choice(unique_movie_ids)
+                negative_item = np.random.choice(unique_movie_ids, p=distribution)
             users.append(u)
             items.append(negative_item)
             labels.append(0) # items not interacted with are negative
@@ -49,9 +46,10 @@ def augment_data(data, unique_movie_ids, num_negatives=4):
     return {'user_id': users, 'movie_id':  items, 'user_rating': labels}
 
 class NegativeSamplingDatasetWrapper(tf.keras.utils.Sequence):
-    def __init__(self, data, args, unique_movie_ids):
+    def __init__(self, data, args, unique_movie_ids, distribution=None):
         self.positives = data
-        self.current = augment_data(self.positives, unique_movie_ids, args.num_negatives)
+        self.distribution = distribution
+        self.current = augment_data(self.positives, unique_movie_ids, args.num_negatives, distribution)
         self.unique_movie_ids = unique_movie_ids
         self.args = args
         # train = data.to_dict("list")
@@ -67,7 +65,7 @@ class NegativeSamplingDatasetWrapper(tf.keras.utils.Sequence):
 
     def on_epoch_end(self):
         #print('on_epoch_end')
-        self.current = augment_data(self.positives, self.unique_movie_ids, self.args.num_negatives)
+        self.current = augment_data(self.positives, self.unique_movie_ids, self.args.num_negatives, self.distribution)
 
     def __getitem__(self, idx):
         start = idx * self.batch_size

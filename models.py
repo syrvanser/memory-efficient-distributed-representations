@@ -1,7 +1,7 @@
 import tensorflow as tf
 import tensorflow_recommenders as tfrs
 
-from dpq_embedding import DPQEmbedding, MGQEEmbedding
+from dpq_embedding import DPQEmbedding, MGQEEmbedding, TripleMGQEEmbedding
 from typing import Dict, Text
 from utils import augment_data
 class RankingModel(tf.keras.Model):
@@ -132,11 +132,19 @@ class MGQERankingModel(tf.keras.Model):
         super().__init__()
 
         # Compute embeddings for users.
-        self.user_embeddings = MGQEEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), frequencies=user_freqs, share_subspace=args.shared_centroids)
+        if args.partitions == 3:
+            # Compute embeddings for users.
+            self.user_embeddings = TripleMGQEEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), frequencies=user_freqs, share_subspace=args.shared_centroids)
 
-        # Compute embeddings for movies.
-        self.movie_embeddings = MGQEEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), frequencies=movie_freqs, share_subspace=args.shared_centroids)
-    
+            # Compute embeddings for movies.
+            self.movie_embeddings = TripleMGQEEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), frequencies=movie_freqs, share_subspace=args.shared_centroids)
+        else:
+            # Compute embeddings for users.
+            self.user_embeddings = MGQEEmbedding(args.k, args.d, len(unique_user_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), frequencies=user_freqs, share_subspace=args.shared_centroids)
+
+            # Compute embeddings for movies.
+            self.movie_embeddings = MGQEEmbedding(args.k, args.d, len(unique_movie_ids) + 1, args.embedding_dimensions, activity_regularizer=tf.keras.regularizers.l2(args.l2_norm), frequencies=movie_freqs, share_subspace=args.shared_centroids)
+
         # Compute predictions.
         self.ratings = tf.keras.Sequential([
             # Learn multiple dense layers.
