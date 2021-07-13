@@ -125,13 +125,13 @@ validation = validation[['user_id', 'movie_id', 'user_rating']]
 train.loc[:, 'user_rating'] = 1
 
 
-distribution = train['movie_id'].value_counts().sort_index()
-p = np.asarray(distribution).astype('float64')
-p = p / np.sum(p)
+# distribution = train['movie_id'].value_counts().sort_index()
+# p = np.asarray(distribution).astype('float64')
+# p = p / np.sum(p)
 
 
 #train = augment_data(train, unique_movie_ids, args.num_negatives)
-train = NegativeSamplingDatasetWrapper(train, args, train['movie_id'].unique(), p)
+train = NegativeSamplingDatasetWrapper(train, args, train['movie_id'].unique())
 #validation = augment_data(validation, unique_movie_ids, args.num_negatives)
 
 validation = pd.DataFrame.from_dict(validation).to_dict("list")
