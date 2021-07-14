@@ -288,8 +288,8 @@ class TripleMGQEEmbedding(tf.keras.layers.Layer):
         self.vocab_size = vocab_size
         self.embedding_size = embebdding_size
         self.share_subspace = share_subspace
-        n_1 = 99
-        n_2 =90
+        n_1 = 90
+        n_2 =99
         cutoff_1 = int(len(frequencies)*(n_1/100))
         cutoff_2 = int(len(frequencies)*(n_2/100))
         tail = frequencies[:cutoff_1]
