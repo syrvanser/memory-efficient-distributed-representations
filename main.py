@@ -168,7 +168,7 @@ with mirrored_strategy.scope():
         vals = []
         for index, row in train_pivoted.iterrows():
             ids = (row.where(row > 0).dropna().index.to_list()) 
-            vals.append(sum(train_pivoted[ids].sum(axis=1))- len(ids))
+            vals.append(sum(train_pivoted[ids].sum(axis=1))*row.sum())
         user_freq['movie_id'] = vals
 
         user_freq = user_freq.sort_values(by=['movie_id'])
@@ -181,7 +181,7 @@ with mirrored_strategy.scope():
         vals = []
         for index, row in train_pivoted.iterrows():
             ids = (row.where(row > 0).dropna().index.to_list()) 
-            vals.append(sum(train_pivoted[ids].sum(axis=1)) - len(ids))
+            vals.append(sum(train_pivoted[ids].sum(axis=1))*row.sum())
         
         movie_freq['user_id'] = vals
 

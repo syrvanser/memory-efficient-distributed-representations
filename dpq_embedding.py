@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 from collections import defaultdict
-import tf_slim as slim
 
 class DPQEmbedding(tf.keras.layers.Layer):
 
@@ -143,7 +142,7 @@ class MGQEEmbedding(tf.keras.layers.Layer):
             keys=tf.constant( head['id'].tolist() + tail['id'].tolist()),
             values=tf.constant([0] * len(head) + [1] * len(tail)),
         ),
-        default_value=tf.constant(k),
+        default_value=tf.constant(1),
         name="partitions"
         )
 
@@ -313,7 +312,7 @@ class TripleMGQEEmbedding(tf.keras.layers.Layer):
             keys=tf.constant( head['id'].tolist() +  mid['id'].tolist() + tail['id'].tolist()),
             values=tf.constant([0] * len(head) + [1] * len(mid) + [2] * len(tail)),
         ),
-        default_value=tf.constant(k),
+        default_value=tf.constant(2),
         name="partitions"
         )
 
