@@ -1,8 +1,8 @@
-from re import I
 import tensorflow as tf
 import numpy as np
 import pandas as pd
 from collections import defaultdict
+import tf_slim as slim
 
 class DPQEmbedding(tf.keras.layers.Layer):
 
@@ -84,6 +84,18 @@ class KDQuantizer(tf.keras.layers.Layer):
 
         # Compute the codes based on response.
         codes = tf.argmax(response, -1, output_type=tf.int32)  # (batch_size, D)
+        #slim.model_analyzer.analyze_vars([codes, self.centroids_k], print_info=True)
+        var_size = codes.get_shape().num_elements() or 0
+        var_bytes = var_size * codes.dtype.size
+        print("codes", var_bytes / 256)
+        print(codes.dtype.size, var_size)
+        print(codes.shape)
+        var_size = self.centroids_k.get_shape().num_elements() or 0
+        var_bytes = var_size * self.centroids_k.dtype.size
+        print(self.centroids_k.dtype.size, var_size)
+        print(self.centroids_k.shape)
+        print("centr", var_bytes)
+        
         neighbor_idxs = codes
 
         # Compute the outputs, which has shape (batch_size, D, d_out)

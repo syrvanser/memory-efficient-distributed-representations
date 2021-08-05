@@ -103,4 +103,4 @@ train.loc[:, 'user_rating'] = 1
 # # print(len(validation['user_id']))
 # validation = tf.data.Dataset.from_tensor_slices(validation)
 
-print(train.head(50))
+print(train.head(100))

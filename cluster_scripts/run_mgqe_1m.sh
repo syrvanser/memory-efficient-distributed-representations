@@ -49,7 +49,7 @@ dataset=1m
 exp_dir=mgqe_1m
 model=mgqe
 seed=0
-k=32
+k=128
 d=32
 shared_centroids=false
 

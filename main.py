@@ -123,6 +123,7 @@ train = train[['user_id', 'movie_id', 'user_rating']]
 test = test[['user_id', 'movie_id', 'user_rating']]
 validation = validation[['user_id', 'movie_id', 'user_rating']]
 train.loc[:, 'user_rating'] = 1
+train_df = train
 
 
 # distribution = train['movie_id'].value_counts().sort_index()
@@ -151,16 +152,45 @@ with mirrored_strategy.scope():
     elif args.model == "dpq": 
         model = DPQMovielensModel(args, unique_user_ids, unique_movie_ids)
     elif args.model == "mgqe":
-        user_freq = ratings[['user_id','movie_id']].groupby('user_id').agg('count')
+        user_freq = train_df[['user_id','movie_id']].groupby('user_id').agg('count')
         user_freq = user_freq.sort_values(by=['movie_id'])
         user_freq.reset_index(level=0, inplace=True)
         user_freq = user_freq.rename(columns={"user_id": "id", "movie_id": "freq"})
-        movie_freq = ratings[['user_id','movie_id']].groupby('movie_id').agg('count')
+        movie_freq = train_df[['user_id','movie_id']].groupby('movie_id').agg('count')
         movie_freq = movie_freq.sort_values(by=['user_id'])
         movie_freq.reset_index(level=0, inplace=True)
         movie_freq = movie_freq.rename(columns={"movie_id": "id", "user_id": "freq"})
-        
+
         model = MGQEMovielensModel(args, unique_user_ids, unique_movie_ids, user_freq, movie_freq)
+    elif args.model == "mgqe_co":
+        user_freq = train_df[['user_id','movie_id']].groupby('user_id').agg('count')
+        train_pivoted = pd.pivot_table(train_df,values='user_rating',columns='movie_id',index='user_id').fillna(0)
+        vals = []
+        for index, row in train_pivoted.iterrows():
+            ids = (row.where(row > 0).dropna().index.to_list()) 
+            vals.append(sum(train_pivoted[ids].sum(axis=1))- len(ids))
+        user_freq['movie_id'] = vals
+
+        user_freq = user_freq.sort_values(by=['movie_id'])
+        user_freq.reset_index(level=0, inplace=True)
+        user_freq = user_freq.rename(columns={"user_id": "id", "movie_id": "freq"})
+
+
+        movie_freq = train_df[['user_id','movie_id']].groupby('movie_id').agg('count')
+        train_pivoted = pd.pivot_table(train_df,values='user_rating',columns='user_id',index='movie_id').fillna(0)
+        vals = []
+        for index, row in train_pivoted.iterrows():
+            ids = (row.where(row > 0).dropna().index.to_list()) 
+            vals.append(sum(train_pivoted[ids].sum(axis=1)) - len(ids))
+        
+        movie_freq['user_id'] = vals
+
+        movie_freq = movie_freq.sort_values(by=['user_id'])
+        movie_freq.reset_index(level=0, inplace=True)
+        movie_freq = movie_freq.rename(columns={"movie_id": "id", "user_id": "freq"})
+
+        model = MGQEMovielensModel(args, unique_user_ids, unique_movie_ids, user_freq, movie_freq)
+
     elif args.model == "neumf":
         model = NeuMFMovielensModel(args, unique_user_ids, unique_movie_ids)
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(args.learning_rate, decay_steps=100000, decay_rate=0.96, staircase=True)
