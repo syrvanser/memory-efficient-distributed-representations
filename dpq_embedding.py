@@ -86,14 +86,8 @@ class KDQuantizer(tf.keras.layers.Layer):
         #slim.model_analyzer.analyze_vars([codes, self.centroids_k], print_info=True)
         var_size = codes.get_shape().num_elements() or 0
         var_bytes = var_size * codes.dtype.size
-        print("codes", var_bytes / 256)
-        print(codes.dtype.size, var_size)
-        print(codes.shape)
         var_size = self.centroids_k.get_shape().num_elements() or 0
         var_bytes = var_size * self.centroids_k.dtype.size
-        print(self.centroids_k.dtype.size, var_size)
-        print(self.centroids_k.shape)
-        print("centr", var_bytes)
         
         neighbor_idxs = codes
 
@@ -132,7 +126,7 @@ class MGQEEmbedding(tf.keras.layers.Layer):
         self.vocab_size = vocab_size
         self.embedding_size = embebdding_size
         self.share_subspace = share_subspace
-        n = 80
+        n = 90
         cutoff = int(len(frequencies)*(n/100))
         tail = frequencies[:cutoff]
         head = frequencies[cutoff:]
